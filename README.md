@@ -1,3 +1,6 @@
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/6dc4caa1-d6b5-4c87-9e47-1e0296b0676c" />
+
+
 # Global Support Standard (GSS)
 
 Open protocol for machine-readable e-commerce support.
