@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "global-support-standard"
 version = "0.2.0"
-description = "GSS Python MVP: provider API + CLI consumer"
+description = "GSS Python reference implementation: provider API + CLI consumer"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -30,11 +30,11 @@ dependencies = [
   "PyYAML>=6.0.1",
 ]
 [project.urls]
-Homepage = "https://github.com/MichelN89/global-support-standard"
-Repository = "https://github.com/MichelN89/global-support-standard"
-Issues = "https://github.com/MichelN89/global-support-standard/issues"
-Documentation = "https://github.com/MichelN89/global-support-standard/tree/main/docs"
-Changelog = "https://github.com/MichelN89/global-support-standard/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Global-Support-Standard/global-support-standard"
+Repository = "https://github.com/Global-Support-Standard/global-support-standard"
+Issues = "https://github.com/Global-Support-Standard/global-support-standard/issues"
+Documentation = "https://github.com/Global-Support-Standard/global-support-standard/tree/main/docs"
+Changelog = "https://github.com/Global-Support-Standard/global-support-standard/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
