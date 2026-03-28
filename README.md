@@ -206,6 +206,7 @@ Current test coverage includes:
 - Spec overview: `spec/overview.md`
 - Architecture deep dive: `docs/architecture.md`
 - API request examples: `docs/api-examples.md`
+- Commands reference: `docs/commands-reference.md`
 - Compliance/trust boundary: `docs/compliance-and-trust.md`
 - Authorization model: `docs/authorization-model.md`
 - Agent delegation model: `docs/agent-delegation-model.md`
