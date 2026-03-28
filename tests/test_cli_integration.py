@@ -74,3 +74,13 @@ def test_cli_returns_two_step_flow(monkeypatch, tmp_path: Path) -> None:
     confirm = runner.invoke(cli_main.app, ["mockshop.local", "returns", "confirm", "--token", token])
     assert confirm.exit_code == 0, confirm.output
     assert json.loads(confirm.output)["data"]["status"] == "submitted"
+
+
+def test_cli_describe_warns_if_uncertified(monkeypatch, tmp_path: Path) -> None:
+    client = TestClient(app)
+    _install_test_transport(monkeypatch, client)
+    monkeypatch.setattr(cli_main, "TOKEN_PATH", tmp_path / "tokens.json")
+    runner = CliRunner()
+    res = runner.invoke(cli_main.app, ["mockshop.local", "describe"])
+    assert res.exit_code == 0, res.output
+    assert "not GSS certified" in res.stderr

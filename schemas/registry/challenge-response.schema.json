@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gss.dev/schemas/registry/challenge-response.schema.json",
+  "title": "GSS Registry Challenge Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registration_id",
+    "challenge_id",
+    "challenge_token",
+    "expires_at",
+    "methods_allowed"
+  ],
+  "properties": {
+    "registration_id": { "type": "string", "minLength": 1 },
+    "challenge_id": { "type": "string", "minLength": 1 },
+    "challenge_token": { "type": "string", "minLength": 8 },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "methods_allowed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["dns_txt", "well_known"]
+      },
+      "uniqueItems": true
+    }
+  }
+}

@@ -22,17 +22,25 @@ def _resolve_endpoint(shop: str) -> str:
 
 
 def _load_tokens() -> dict[str, str]:
+    if os.getenv("GSS_STORE_TOKENS", "1").lower() in {"0", "false", "no"}:
+        return {}
     if not TOKEN_PATH.exists():
         return {}
     return json.loads(TOKEN_PATH.read_text())
 
 
 def _save_tokens(tokens: dict[str, str]) -> None:
+    if os.getenv("GSS_STORE_TOKENS", "1").lower() in {"0", "false", "no"}:
+        return
     TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     TOKEN_PATH.write_text(json.dumps(tokens, indent=2))
+    os.chmod(TOKEN_PATH, 0o600)
 
 
 def _token_for(shop: str) -> str | None:
+    inline_token = os.getenv("GSS_CUSTOMER_TOKEN")
+    if inline_token:
+        return inline_token
     return _load_tokens().get(shop)
 
 
@@ -90,6 +98,24 @@ def _emit(value: dict[str, Any]) -> None:
     typer.echo(json.dumps(value, indent=2))
 
 
+def _warn_if_uncertified(describe_payload: dict[str, Any]) -> None:
+    data = describe_payload.get("data", {})
+    compliance = data.get("compliance")
+    if not isinstance(compliance, dict):
+        typer.echo(
+            "Warning: shop does not expose compliance metadata. Trust level unknown.",
+            err=True,
+        )
+        return
+    if not compliance.get("certified", False):
+        level = compliance.get("level", "unknown")
+        suite = compliance.get("test_suite_version", "unverified")
+        typer.echo(
+            f"Warning: shop is not GSS certified (level={level}, suite={suite}).",
+            err=True,
+        )
+
+
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
     add_help_option=True,
@@ -102,7 +128,9 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
         raise typer.BadParameter("Expected command pattern: gss <shop> <domain> <action>")
 
     if positionals[0] == "describe":
-        _emit(_request(method="GET", endpoint=endpoint, path="/describe"))
+        describe_payload = _request(method="GET", endpoint=endpoint, path="/describe")
+        _warn_if_uncertified(describe_payload)
+        _emit(describe_payload)
         return
 
     domain = positionals[0]
@@ -118,9 +146,12 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
             body={"method": method, "customer_id": customer_id},
         )
         token = res["data"]["access_token"]
-        tokens = _load_tokens()
-        tokens[shop] = token
-        _save_tokens(tokens)
+        if os.getenv("GSS_STORE_TOKENS", "1").lower() in {"0", "false", "no"}:
+            typer.echo("Token storage disabled. Export GSS_CUSTOMER_TOKEN for subsequent commands.", err=True)
+        else:
+            tokens = _load_tokens()
+            tokens[shop] = token
+            _save_tokens(tokens)
         _emit(res)
         return
 

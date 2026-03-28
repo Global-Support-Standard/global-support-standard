@@ -1455,6 +1455,8 @@ $ gss registry lookup coolblue.nl
 → https://gss.coolblue.nl/v1
 ```
 
+Registry implementers should follow the security model in `docs/registry-security.md`, including mandatory domain-ownership verification and conflict handling.
+
 ### 5.2 Transport
 
 GSS is transport-agnostic. The standard defines the command structure and response format. The transport can be:

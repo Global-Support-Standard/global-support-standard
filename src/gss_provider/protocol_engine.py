@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +12,15 @@ from gss_provider.mock_data import enriched_context
 
 class ProtocolEngine:
     def __init__(self, protocols_dir: Path) -> None:
-        self.protocols_dir = protocols_dir
+        self.protocols_dir = protocols_dir.resolve()
 
     def _path_for_trigger(self, trigger: str) -> Path:
-        return self.protocols_dir / f"{trigger}.yaml"
+        if not re.fullmatch(r"[a-z0-9-]+", trigger):
+            raise err("VALIDATION_ERROR", "Trigger contains invalid characters", status_code=400)
+        path = (self.protocols_dir / f"{trigger}.yaml").resolve()
+        if not path.is_relative_to(self.protocols_dir):
+            raise err("VALIDATION_ERROR", "Invalid protocol trigger path", status_code=400)
+        return path
 
     def _matches(self, condition: dict[str, Any], context: dict[str, Any]) -> bool:
         for key, expected in condition.items():

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gss.dev/schemas/registry/error-response.schema.json",
+  "title": "GSS Registry Error Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "error"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "const": "error"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "CHALLENGE_EXPIRED",
+            "DOMAIN_NOT_VERIFIED",
+            "DOMAIN_ALREADY_VERIFIED",
+            "VERIFICATION_CONFLICT",
+            "ENDPOINT_REQUIRES_REVERIFICATION",
+            "RATE_LIMITED",
+            "ABUSE_BLOCKED"
+          ]
+        },
+        "message": { "type": "string" },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

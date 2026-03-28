@@ -3,11 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-
-AUDIT_LOG: list[dict[str, Any]] = []
-
+from gss_provider.contracts import ShopRuntimeAdapter
 
 def log_action(
+    store: ShopRuntimeAdapter,
     *,
     customer_id: str,
     consumer_id: str,
@@ -20,7 +19,7 @@ def log_action(
     protocol_used: str | None = None,
     confirmation_token: str | None = None,
 ) -> None:
-    AUDIT_LOG.append(
+    store.append_event(
         {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "customer_id": customer_id,
@@ -37,5 +36,5 @@ def log_action(
     )
 
 
-def get_customer_audit(customer_id: str) -> list[dict[str, Any]]:
-    return [row for row in AUDIT_LOG if row["customer_id"] == customer_id]
+def get_customer_audit(store: ShopRuntimeAdapter, customer_id: str) -> list[dict[str, Any]]:
+    return store.list_customer_events(customer_id)

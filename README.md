@@ -1,13 +1,83 @@
-# Global Support Standard (GSS) Python MVP
+# Global Support Standard (GSS)
 
-This repository contains an end-to-end MVP for the GSS briefing:
+Open protocol for machine-readable e-commerce support.
 
-- `gss_provider` (FastAPI): mock shop provider implementing core GSS endpoints
-- `gss` (Typer CLI): consumer command interface using `gss <shop> <domain> <action>`
-- YAML protocol engine for shop-defined resolution logic
-- Basic auth/session flow, confirmation-token actions, and audit logging
+[![CI](https://github.com/MichelN89/global-support-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/MichelN89/global-support-standard/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MichelN89/global-support-standard)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 
-## Install
+GSS lets any app, AI agent, or device resolve customer support requests directly with a shop using a consistent command model:
+
+```bash
+gss <shop> <domain> <action> [--flags]
+```
+
+This repository includes a Python MVP implementation of the protocol and supporting project docs.
+
+## Why GSS
+
+Most support requests are policy execution, not free-form conversation:
+
+- "Where is my package?"
+- "Can I return this item?"
+- "Why is my refund delayed?"
+- "Can you show my account audit trail?"
+
+Today these flows are reimplemented per shop and routed through human agents. GSS standardizes these operations so support can be:
+
+- Faster (seconds, not days)
+- Consistent across shops
+- Safer for automation (action levels, confirmation tokens, auditability)
+- Consumer-agnostic (AI, mobile app, browser extension, device)
+
+## Repository At A Glance
+
+| Area | Purpose |
+|---|---|
+| `src/gss_provider` | FastAPI provider server (shop-facing implementation) |
+| `src/gss_cli` | Typer CLI consumer (`gss` command) |
+| `src/gss_core` | Shared models, envelope helpers, and error contracts |
+| `protocols/` | Protocol format docs and runnable YAML examples |
+| `providers/mock_shop` | Example consumer-policy configuration |
+| `spec/` | Protocol/spec narrative and architecture references |
+| `docs/` | Getting-started docs for shops and consumers |
+| `tests/` | API and CLI integration tests |
+
+## MVP Scope (Implemented)
+
+This codebase currently ships an end-to-end MVP:
+
+- Provider API with standardized response envelope
+- CLI with `gss <shop> <domain> <action>` routing
+- Mock shop adapter/data layer
+- Protocol engine (YAML rules + context enrichment)
+- Security baseline:
+  - Customer auth token flow
+  - Required `GSS-Consumer-*` headers
+  - Two-step request execution (`returns initiate` -> `returns confirm`)
+  - Append-only audit log records
+- Stateless core boundary:
+  - Framework defines contracts and orchestration
+  - Shops own persistence/secret storage in adapter implementations
+
+## Architecture
+
+```mermaid
+flowchart LR
+  consumerClient[Client app/AI/device] -->|gss commands| cli[gss CLI]
+  cli -->|HTTP + GSS headers| provider[gss_provider FastAPI]
+  provider --> describe[DescribeService]
+  provider --> domains[Domain Services]
+  provider --> protocols[Protocol Engine]
+  provider --> auth[Auth Context]
+  provider --> audit[Audit Logger]
+  domains --> adapter[Mock Shop Data]
+  protocols --> yaml[Protocol YAML files]
+```
+
+## Quickstart
+
+### 1) Install
 
 ```bash
 python -m venv .venv
@@ -15,15 +85,15 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## Run Provider
+### 2) Start provider
 
 ```bash
 gss-provider
 ```
 
-Provider runs on `http://127.0.0.1:8000/v1`.
+Default endpoint: `http://127.0.0.1:8000/v1`
 
-## Use CLI
+### 3) Run consumer flow
 
 ```bash
 gss mockshop.local describe
@@ -37,27 +107,89 @@ gss mockshop.local returns confirm --token <confirmation_token>
 gss mockshop.local account audit-log
 ```
 
-## Implemented MVP Features
+Optional token behavior:
+- default: CLI stores token locally in `~/.gss/tokens.json`
+- disable local storage: `GSS_STORE_TOKENS=0`
+- provide token explicitly: `GSS_CUSTOMER_TOKEN=<token>`
 
-- Discovery:
-  - `GET /v1/describe`
-  - `GET /v1/{domain}/describe`
-- Auth:
-  - `POST /v1/auth/login`
-- Domains:
-  - `orders list/get`
-  - `shipping track`
-  - `returns check-eligibility/initiate/confirm`
-  - `protocols get`
-  - `account audit-log`
-- Security baseline:
-  - Authorization token required for protected endpoints
-  - required `GSS-Consumer-*` headers
-  - two-step confirmation token flow for request actions
-  - append-only audit log records
+### Shopify webshop project (inside this repo)
 
-## Test
+```bash
+gss-shopify-provider
+```
+
+See `webshop/shopify-test-store/README.md` for setup against your test store.
+
+## HTTP Endpoints (MVP)
+
+### Discovery
+- `GET /v1/describe`
+- `GET /v1/{domain}/describe`
+
+### Auth
+- `POST /v1/auth/login`
+
+### Domains
+- `GET /v1/orders`
+- `GET /v1/orders/{order_id}`
+- `GET /v1/shipping/track/{order_id}`
+- `POST /v1/returns/check-eligibility`
+- `POST /v1/returns/initiate`
+- `POST /v1/returns/confirm`
+- `POST /v1/protocols/get`
+- `GET /v1/account/audit-log`
+
+## Security Model Highlights
+
+- Every protected request requires:
+  - `Authorization: Bearer <token>`
+  - `GSS-Consumer-Id`
+  - `GSS-Consumer-Type`
+  - `GSS-Version`
+- `request` actions are two-step by design (issue confirmation token, then confirm)
+- Authorization is customer-scoped and domain actions enforce ownership checks
+- Request/action events are recorded to the audit log
+- Trust signaling:
+  - `describe` includes compliance metadata (`level`, `certified`, `test_suite_version`)
+  - CLI warns when a shop is uncertified or missing compliance metadata
+
+## Trust Boundary
+
+GSS defines protocol contracts and package logic. Shop implementations own operational security and persistence (token systems, session stores, audit infrastructure).  
+See `docs/compliance-and-trust.md` for full guidance.
+
+## Testing
 
 ```bash
 pytest
 ```
+
+Current test coverage includes:
+
+- happy-path API flows
+- forbidden cross-customer order access
+- missing header rejection
+- protocol enrichment behavior
+- CLI integration for login, listing orders, and two-step returns
+
+## Documentation
+
+- Main briefing: `gss-open-standard-briefing (1).md`
+- Spec overview: `spec/overview.md`
+- Architecture deep dive: `docs/architecture.md`
+- API request examples: `docs/api-examples.md`
+- Compliance/trust boundary: `docs/compliance-and-trust.md`
+- Registry security spec: `docs/registry-security.md`
+- Registry conformance checklist: `docs/registry-conformance-checklist.md`
+- Shopify webshop project: `webshop/shopify-test-store/README.md`
+- Shop onboarding: `docs/getting-started-shops.md`
+- Consumer onboarding: `docs/getting-started-consumers.md`
+- Protocol format: `protocols/FORMAT.md`
+
+## Contributing
+
+See `CONTRIBUTING.md` for contribution expectations.
+
+## License
+
+This project is licensed under the terms in `LICENSE`.

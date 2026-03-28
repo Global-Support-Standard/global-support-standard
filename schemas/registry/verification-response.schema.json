@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gss.dev/schemas/registry/verification-response.schema.json",
+  "title": "GSS Registry Verification Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop_domain",
+    "endpoint",
+    "status",
+    "verification_method",
+    "verified_at",
+    "next_reverify_at"
+  ],
+  "properties": {
+    "shop_domain": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9.-]+$"
+    },
+    "endpoint": {
+      "type": "string",
+      "format": "uri"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["verified", "pending", "suspended"]
+    },
+    "verification_method": {
+      "type": "string",
+      "enum": ["dns_txt", "well_known"]
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "next_reverify_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
