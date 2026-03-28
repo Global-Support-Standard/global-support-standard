@@ -1,6 +1,6 @@
-# GSS MVP Architecture
+# GSS Reference Architecture
 
-This document explains how the Python MVP is structured, how requests flow through the system, and where to extend the implementation.
+This document explains how the Python reference implementation is structured, how requests flow through the system, and where to extend the implementation.
 
 The current architecture treats GSS as a stateless orchestration layer: webshop implementations own token/audit/confirmation persistence behind adapter contracts.
 
@@ -14,7 +14,7 @@ flowchart LR
   api --> domains[Domain handlers]
   api --> engine[Protocol engine]
   api --> audit[Audit logger]
-  domains --> mockData[Mock shop data source]
+  domains --> mockData[Reference shop data source]
   auth --> adapter[Shop runtime adapter]
   audit --> adapter
   engine --> yamlFiles[Protocol YAML files]
@@ -66,12 +66,12 @@ flowchart TD
   fallback --> response
 ```
 
-Rule behavior in the MVP:
+Rule behavior in the reference implementation:
 - First matching rule wins.
 - Conditions support exact values and basic comparators (`gte`, `lte`, `eq`).
 - Output includes both `context_received` and `context_enriched`.
 
-## Security In MVP
+## Security In Reference Implementation
 
 - Protected endpoints require a valid bearer token.
 - Consumer identity/type headers are mandatory.
@@ -82,10 +82,10 @@ Rule behavior in the MVP:
 
 ## Extension Points
 
-To evolve beyond MVP:
+To evolve from the default demo adapter to production adapters:
 
 1. Implement webshop-specific production adapters (e.g., Redis/Postgres/IdP-backed) for auth/confirmation/audit contracts.
-2. Replace mock data adapter with platform adapters (Shopify, WooCommerce, custom).
+2. Replace the local demo data adapter with platform adapters (Shopify, WooCommerce, custom).
 3. Add richer protocol condition syntax (boolean ops, nested expressions, priorities).
 4. Implement rate limiting and scope-based authorization.
 5. Expand domains toward full standard coverage.

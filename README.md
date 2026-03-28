@@ -2,8 +2,8 @@
 
 Open protocol for machine-readable e-commerce support.
 
-[![CI](https://github.com/MichelN89/global-support-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/MichelN89/global-support-standard/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/MichelN89/global-support-standard)](LICENSE)
+[![CI](https://github.com/Global-Support-Standard/global-support-standard/actions/workflows/ci.yml/badge.svg)](https://github.com/Global-Support-Standard/global-support-standard/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Global-Support-Standard/global-support-standard)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 
 GSS lets any app, AI agent, or device resolve customer support requests directly with a shop using a consistent command model:
@@ -12,7 +12,7 @@ GSS lets any app, AI agent, or device resolve customer support requests directly
 gss <shop> <domain> <action> [--flags]
 ```
 
-This repository includes a Python MVP implementation of the protocol and supporting project docs.
+This repository includes a Python reference implementation of the protocol and supporting project docs.
 
 ## Why GSS
 
@@ -44,13 +44,13 @@ Today these flows are reimplemented per shop and routed through human agents. GS
 | `docs/` | Getting-started docs for shops and consumers |
 | `tests/` | API and CLI integration tests |
 
-## MVP Scope (Implemented)
+## Reference Implementation Scope
 
-This codebase currently ships an end-to-end MVP:
+This codebase currently ships an end-to-end production baseline:
 
 - Provider API with standardized response envelope
 - CLI with `gss <shop> <domain> <action>` routing
-- Mock shop adapter/data layer
+- Local demo adapter/data layer
 - Protocol engine (YAML rules + context enrichment)
 - Security baseline:
   - Customer auth token flow
@@ -72,7 +72,7 @@ flowchart LR
   provider --> protocols[Protocol Engine]
   provider --> auth[Auth Context]
   provider --> audit[Audit Logger]
-  domains --> adapter[Mock Shop Data]
+  domains --> adapter[Reference Shop Adapter]
   protocols --> yaml[Protocol YAML files]
 ```
 
@@ -122,7 +122,7 @@ gss-shopify-provider
 See `webshop/shopify-test-store/README.md` for setup against your test store.
 The Shopify demo includes an agent-first auth flow (`auth verify-customer` -> `auth issue-token`) in addition to legacy dev login.
 
-## HTTP Endpoints (MVP)
+## HTTP Endpoints
 
 ### Discovery
 - `GET /v1/describe`

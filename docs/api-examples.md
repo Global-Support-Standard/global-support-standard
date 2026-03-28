@@ -1,4 +1,4 @@
-# API Examples (MVP)
+# API Examples
 
 These examples show how to call the provider HTTP API directly.
 

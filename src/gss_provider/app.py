@@ -44,7 +44,7 @@ def create_app(
     runtime_adapter = adapter or InMemoryShopAdapter()
     protocol_engine = ProtocolEngine(runtime_settings.protocol_dir)
 
-    app = FastAPI(title="GSS Provider MVP", version="0.1.0")
+    app = FastAPI(title="GSS Provider", version="0.2.0")
 
     @app.middleware("http")
     async def request_logging_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]

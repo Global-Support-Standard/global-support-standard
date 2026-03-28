@@ -2,14 +2,14 @@
 
 Thanks for contributing to the Global Support Standard.
 
-This repo includes both specification content and a Python MVP implementation. We welcome contributions to both.
+This repo includes both specification content and a Python reference implementation. We welcome contributions to both.
 
 ## Ways To Contribute
 
 - **Spec and docs improvements**
   - Clarify definitions and edge cases
   - Improve examples and onboarding docs
-- **MVP implementation**
+- **Reference implementation**
   - New domain handlers
   - Better auth/security enforcement
   - Protocol engine enhancements
@@ -27,7 +27,7 @@ This repo includes both specification content and a Python MVP implementation. W
 ## Local Development
 
 ```bash
-git clone https://github.com/MichelN89/global-support-standard.git
+git clone https://github.com/Global-Support-Standard/global-support-standard.git
 cd global-support-standard
 python -m venv .venv
 source .venv/bin/activate
