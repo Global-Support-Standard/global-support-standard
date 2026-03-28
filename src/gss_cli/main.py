@@ -98,6 +98,12 @@ def _emit(value: dict[str, Any]) -> None:
     typer.echo(json.dumps(value, indent=2))
 
 
+def _required(flags: dict[str, Any], *keys: str) -> None:
+    missing = [key for key in keys if key not in flags]
+    if missing:
+        raise typer.BadParameter(f"Missing required flag(s): {', '.join('--' + m.replace('_', '-') for m in missing)}")
+
+
 def _warn_if_uncertified(describe_payload: dict[str, Any]) -> None:
     data = describe_payload.get("data", {})
     compliance = data.get("compliance")
@@ -197,53 +203,270 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
 
     headers = _headers(shop)
 
-    if domain == "orders" and action == "list":
-        _emit(_request(method="GET", endpoint=endpoint, path="/orders", headers=headers, params=flags))
-        return
-    if domain == "orders" and action == "get":
-        _emit(_request(method="GET", endpoint=endpoint, path=f"/orders/{flags['id']}", headers=headers))
-        return
-    if domain == "shipping" and action == "track":
-        _emit(_request(method="GET", endpoint=endpoint, path=f"/shipping/track/{flags['order_id']}", headers=headers))
-        return
-    if domain == "returns" and action == "check-eligibility":
-        _emit(
-            _request(
-                method="POST",
-                endpoint=endpoint,
-                path="/returns/check-eligibility",
-                headers=headers,
-                body={"order_id": flags["order_id"], "item_id": flags["item_id"]},
+    if domain == "orders":
+        if action == "list":
+            _emit(_request(method="GET", endpoint=endpoint, path="/orders", headers=headers, params=flags))
+            return
+        if action == "get":
+            _required(flags, "id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/orders/{flags['id']}", headers=headers))
+            return
+        if action in {"cancel", "modify", "reorder"}:
+            _required(flags, "id")
+            body: dict[str, Any] = {"id": flags["id"]}
+            if "reason" in flags:
+                body["reason"] = flags["reason"]
+            if "changes" in flags:
+                body["changes"] = flags["changes"]
+            _emit(_request(method="POST", endpoint=endpoint, path=f"/orders/{action}", headers=headers, body=body))
+            return
+
+    if domain == "returns":
+        if action == "check-eligibility":
+            _required(flags, "order_id", "item_id")
+            _emit(
+                _request(
+                    method="POST",
+                    endpoint=endpoint,
+                    path="/returns/check-eligibility",
+                    headers=headers,
+                    body={"order_id": flags["order_id"], "item_id": flags["item_id"]},
+                )
             )
-        )
-        return
-    if domain == "returns" and action == "initiate":
-        _emit(
-            _request(
-                method="POST",
-                endpoint=endpoint,
-                path="/returns/initiate",
-                headers=headers,
-                body={
-                    "order_id": flags["order_id"],
-                    "item_id": flags["item_id"],
-                    "reason": flags["reason"],
-                },
+            return
+        if action == "initiate":
+            _required(flags, "order_id", "item_id", "reason")
+            body = {"order_id": flags["order_id"], "item_id": flags["item_id"], "reason": flags["reason"]}
+            if "option" in flags:
+                body["option"] = flags["option"]
+            _emit(_request(method="POST", endpoint=endpoint, path="/returns/initiate", headers=headers, body=body))
+            return
+        if action == "confirm":
+            _required(flags, "token")
+            _emit(_request(method="POST", endpoint=endpoint, path="/returns/confirm", headers=headers, body={"token": flags["token"]}))
+            return
+        if action == "status":
+            _required(flags, "return_id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/returns/{flags['return_id']}", headers=headers))
+            return
+        if action == "list":
+            _emit(_request(method="GET", endpoint=endpoint, path="/returns", headers=headers, params=flags))
+            return
+        if action in {"cancel", "dispute", "request-return-back", "accept-partial"}:
+            _required(flags, "return_id")
+            body = {"return_id": flags["return_id"]}
+            if "reason" in flags:
+                body["reason"] = flags["reason"]
+            if "option" in flags:
+                body["option"] = flags["option"]
+            _emit(_request(method="POST", endpoint=endpoint, path=f"/returns/{action}", headers=headers, body=body))
+            return
+
+    if domain == "refunds":
+        if action == "status":
+            _required(flags, "refund_id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/refunds/{flags['refund_id']}", headers=headers))
+            return
+        if action == "list":
+            _emit(_request(method="GET", endpoint=endpoint, path="/refunds", headers=headers, params=flags))
+            return
+
+    if domain == "shipping":
+        if action == "track":
+            _required(flags, "order_id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/shipping/track/{flags['order_id']}", headers=headers))
+            return
+        if action in {"report-issue", "change-address", "request-redelivery"}:
+            _required(flags, "order_id")
+            body = {"order_id": flags["order_id"]}
+            if "issue" in flags:
+                body["issue"] = flags["issue"]
+            if "address" in flags:
+                body["address"] = flags["address"]
+            if "date" in flags:
+                body["date"] = flags["date"]
+            _emit(_request(method="POST", endpoint=endpoint, path=f"/shipping/{action}", headers=headers, body=body))
+            return
+        if action == "delivery-preferences":
+            _required(flags, "set")
+            _emit(_request(method="POST", endpoint=endpoint, path="/shipping/delivery-preferences", headers=headers, body={"set": flags["set"]}))
+            return
+
+    if domain == "products":
+        if action == "get":
+            _required(flags, "id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/products/{flags['id']}", headers=headers))
+            return
+        if action == "search":
+            _required(flags, "query")
+            _emit(_request(method="GET", endpoint=endpoint, path="/products/search", headers=headers, params=flags))
+            return
+        if action == "check-availability":
+            _required(flags, "id")
+            params = {"postal_code": flags["postal_code"]} if "postal_code" in flags else None
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/products/check-availability/{flags['id']}", headers=headers, params=params))
+            return
+        if action == "warranty-status":
+            _required(flags, "id", "purchase_date")
+            _emit(
+                _request(
+                    method="GET",
+                    endpoint=endpoint,
+                    path=f"/products/warranty-status/{flags['id']}",
+                    headers=headers,
+                    params={"purchase_date": flags["purchase_date"]},
+                )
             )
-        )
-        return
-    if domain == "returns" and action == "confirm":
-        _emit(
-            _request(
-                method="POST",
-                endpoint=endpoint,
-                path="/returns/confirm",
-                headers=headers,
-                body={"token": flags["token"]},
-            )
-        )
-        return
+            return
+        if action == "notify-restock":
+            _required(flags, "id", "email")
+            _emit(_request(method="POST", endpoint=endpoint, path="/products/notify-restock", headers=headers, body={"id": flags["id"], "email": flags["email"]}))
+            return
+        if action == "compare":
+            _required(flags, "ids")
+            _emit(_request(method="GET", endpoint=endpoint, path="/products/compare", headers=headers, params={"ids": flags["ids"]}))
+            return
+
+    if domain == "account":
+        if action == "get":
+            _emit(_request(method="GET", endpoint=endpoint, path="/account", headers=headers))
+            return
+        if action == "update":
+            _required(flags, "changes")
+            _emit(_request(method="POST", endpoint=endpoint, path="/account/update", headers=headers, body={"changes": flags["changes"]}))
+            return
+        if action == "change-email":
+            _required(flags, "new_email")
+            _emit(_request(method="POST", endpoint=endpoint, path="/account/change-email", headers=headers, body={"new_email": flags["new_email"]}))
+            return
+        if action == "change-email-recover":
+            _required(flags, "new_email")
+            _emit(_request(method="POST", endpoint=endpoint, path="/account/change-email-recover", headers=headers, body={"new_email": flags["new_email"]}))
+            return
+        if action == "delete-request":
+            _emit(_request(method="POST", endpoint=endpoint, path="/account/delete-request", headers=headers))
+            return
+        if action == "export-data":
+            _emit(_request(method="GET", endpoint=endpoint, path="/account/export-data", headers=headers))
+            return
+        if action == "audit-log":
+            _emit(_request(method="GET", endpoint=endpoint, path="/account/audit-log", headers=headers, params=flags))
+            return
+        if action == "addresses":
+            if not positionals or len(positionals) < 3:
+                raise typer.BadParameter("Usage: account addresses <list|add|update|delete>")
+            subaction = positionals[2]
+            if subaction == "list":
+                _emit(_request(method="GET", endpoint=endpoint, path="/account/addresses", headers=headers))
+                return
+            if subaction == "add":
+                _required(flags, "address")
+                _emit(_request(method="POST", endpoint=endpoint, path="/account/addresses", headers=headers, body={"address": flags["address"]}))
+                return
+            if subaction == "update":
+                _required(flags, "id", "changes")
+                _emit(
+                    _request(
+                        method="POST",
+                        endpoint=endpoint,
+                        path=f"/account/addresses/{flags['id']}",
+                        headers=headers,
+                        body={"changes": flags["changes"]},
+                    )
+                )
+                return
+            if subaction == "delete":
+                _required(flags, "id")
+                _emit(_request(method="DELETE", endpoint=endpoint, path=f"/account/addresses/{flags['id']}", headers=headers))
+                return
+        if action == "payment-methods":
+            if not positionals or len(positionals) < 3:
+                raise typer.BadParameter("Usage: account payment-methods <list|add|delete>")
+            subaction = positionals[2]
+            if subaction == "list":
+                _emit(_request(method="GET", endpoint=endpoint, path="/account/payment-methods", headers=headers))
+                return
+            if subaction == "add":
+                _required(flags, "method")
+                _emit(_request(method="POST", endpoint=endpoint, path="/account/payment-methods", headers=headers, body={"method": flags["method"]}))
+                return
+            if subaction == "delete":
+                _required(flags, "id")
+                _emit(_request(method="DELETE", endpoint=endpoint, path=f"/account/payment-methods/{flags['id']}", headers=headers))
+                return
+
+    if domain == "payments":
+        if action == "list":
+            _emit(_request(method="GET", endpoint=endpoint, path="/payments", headers=headers, params=flags))
+            return
+        if action == "get":
+            _required(flags, "order_id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{flags['order_id']}", headers=headers))
+            return
+        if action == "invoice":
+            _required(flags, "order_id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{flags['order_id']}/invoice", headers=headers))
+            return
+        if action == "dispute":
+            _required(flags, "order_id", "reason")
+            _emit(_request(method="POST", endpoint=endpoint, path="/payments/dispute", headers=headers, body={"order_id": flags["order_id"], "reason": flags["reason"]}))
+            return
+        if action == "retry":
+            _required(flags, "order_id")
+            _emit(_request(method="POST", endpoint=endpoint, path="/payments/retry", headers=headers, body={"order_id": flags["order_id"]}))
+            return
+
+    if domain == "subscriptions":
+        if action == "list":
+            _emit(_request(method="GET", endpoint=endpoint, path="/subscriptions", headers=headers))
+            return
+        if action == "get":
+            _required(flags, "id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/subscriptions/{flags['id']}", headers=headers))
+            return
+        if action in {"pause", "resume", "cancel", "modify", "skip-next", "change-frequency"}:
+            _required(flags, "id")
+            path = f"/subscriptions/{flags['id']}/{action}"
+            body: dict[str, Any] = {}
+            if "until" in flags:
+                body["until"] = flags["until"]
+            if "reason" in flags:
+                body["reason"] = flags["reason"]
+            if "changes" in flags:
+                body["changes"] = flags["changes"]
+            if "cycle" in flags:
+                body["cycle"] = flags["cycle"]
+            _emit(_request(method="POST", endpoint=endpoint, path=path, headers=headers, body=body or None))
+            return
+
+    if domain == "loyalty":
+        if action == "balance":
+            _emit(_request(method="GET", endpoint=endpoint, path="/loyalty/balance", headers=headers))
+            return
+        if action == "history":
+            _emit(_request(method="GET", endpoint=endpoint, path="/loyalty/history", headers=headers, params=flags))
+            return
+        if action == "redeem":
+            _required(flags, "points", "order_id")
+            _emit(_request(method="POST", endpoint=endpoint, path="/loyalty/redeem", headers=headers, body={"points": flags["points"], "order_id": flags["order_id"]}))
+            return
+        if action == "tier-benefits":
+            _emit(_request(method="GET", endpoint=endpoint, path="/loyalty/tier-benefits", headers=headers))
+            return
+        if action == "rewards":
+            if len(positionals) < 3:
+                raise typer.BadParameter("Usage: loyalty rewards <list|redeem>")
+            subaction = positionals[2]
+            if subaction == "list":
+                _emit(_request(method="GET", endpoint=endpoint, path="/loyalty/rewards", headers=headers))
+                return
+            if subaction == "redeem":
+                _required(flags, "reward_id")
+                _emit(_request(method="POST", endpoint=endpoint, path="/loyalty/rewards/redeem", headers=headers, body={"reward_id": flags["reward_id"]}))
+                return
+
     if domain == "protocols" and action == "get":
+        _required(flags, "trigger")
         context = flags.get("context", "{}")
         _emit(
             _request(
@@ -254,9 +477,6 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
                 body={"trigger": flags["trigger"], "context": json.loads(context)},
             )
         )
-        return
-    if domain == "account" and action == "audit-log":
-        _emit(_request(method="GET", endpoint=endpoint, path="/account/audit-log", headers=headers))
         return
 
     raise typer.BadParameter(f"Unknown command path: {' '.join(positionals)}")
