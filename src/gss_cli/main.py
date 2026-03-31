@@ -12,6 +12,7 @@ from gss_cli.validate import run_validate
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 TOKEN_PATH = Path.home() / ".gss" / "tokens.json"
+LOCAL_DEFAULT_ENDPOINT = "http://127.0.0.1:8000/v1"
 
 
 def _shop_env_key(shop: str) -> str:
@@ -19,8 +20,86 @@ def _shop_env_key(shop: str) -> str:
     return f"GSS_SHOP_{normalized}_ENDPOINT"
 
 
+def _normalize_endpoint(endpoint: str) -> str:
+    return endpoint.rstrip("/")
+
+
+def _looks_like_domain(shop: str) -> bool:
+    return "." in shop and "/" not in shop and ":" not in shop
+
+
+def _extract_endpoint_from_well_known(payload: dict[str, Any], shop: str) -> str | None:
+    for key in ("endpoint", "gss_endpoint", "base_endpoint", "url"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            return _normalize_endpoint(value)
+    shops = payload.get("shops")
+    if isinstance(shops, dict):
+        value = shops.get(shop)
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            return _normalize_endpoint(value)
+    return None
+
+
+def _discover_from_well_known(shop: str) -> str | None:
+    url = f"https://{shop}/.well-known/gss.json"
+    try:
+        with httpx.Client(timeout=3.0, follow_redirects=True) as client:
+            response = client.get(url)
+        if response.status_code >= 400:
+            return None
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return None
+        return _extract_endpoint_from_well_known(payload, shop)
+    except Exception:
+        return None
+
+
+def _discover_from_dns_txt(shop: str) -> str | None:
+    try:
+        import dns.resolver  # type: ignore[import-not-found]
+    except Exception:
+        return None
+    record_name = f"_gss.{shop}"
+    try:
+        answers = dns.resolver.resolve(record_name, "TXT")
+    except Exception:
+        return None
+    for answer in answers:
+        txt = "".join(part.decode("utf-8") for part in answer.strings).strip()
+        for prefix in ("endpoint=", "gss_endpoint=", "gss="):
+            if txt.startswith(prefix):
+                value = txt.split("=", 1)[1].strip()
+                if value.startswith(("http://", "https://")):
+                    return _normalize_endpoint(value)
+        if txt.startswith(("http://", "https://")):
+            return _normalize_endpoint(txt)
+    return None
+
+
+def _discover_endpoint(shop: str) -> str | None:
+    if os.getenv("GSS_DISABLE_DISCOVERY", "0").lower() in {"1", "true", "yes"}:
+        return None
+    if not _looks_like_domain(shop) or shop.endswith(".local"):
+        return None
+    well_known = _discover_from_well_known(shop)
+    if well_known:
+        return well_known
+    return _discover_from_dns_txt(shop)
+
+
 def _resolve_endpoint(shop: str) -> str:
-    return os.getenv(_shop_env_key(shop), os.getenv("GSS_DEFAULT_ENDPOINT", "http://127.0.0.1:8000/v1"))
+    shop_override = os.getenv(_shop_env_key(shop))
+    if shop_override:
+        return _normalize_endpoint(shop_override)
+    global_override = os.getenv("GSS_DEFAULT_ENDPOINT")
+    if global_override:
+        return _normalize_endpoint(global_override)
+    discovered = _discover_endpoint(shop)
+    if discovered:
+        return discovered
+    return LOCAL_DEFAULT_ENDPOINT
 
 
 def _load_tokens() -> dict[str, str]:
@@ -92,9 +171,21 @@ def _request(
     params: dict[str, Any] | None = None,
     body: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    with httpx.Client(timeout=20.0) as client:
-        response = client.request(method, f"{endpoint}{path}", headers=headers, params=params, json=body)
-    data = response.json()
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            response = client.request(method, f"{endpoint}{path}", headers=headers, params=params, json=body)
+    except httpx.RequestError as exc:
+        typer.secho(
+            f"Connection refused: could not reach endpoint {endpoint}. "
+            "Set GSS_DEFAULT_ENDPOINT or GSS_SHOP_<SHOP>_ENDPOINT to a reachable URL.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
     if response.status_code >= 400:
         msg = data.get("error", {}).get("message", "Request failed")
         raise typer.BadParameter(msg)

@@ -94,7 +94,17 @@ pytest --cov=src --cov-report=term-missing --cov-fail-under=80
 docker build -t myshop-gss . && docker run -p 8080:8080 --env-file .env myshop-gss
 ```
 
-Make discoverable via `https://myshop.com/.well-known/gss.json` or DNS TXT record.
+Make your shop discoverable (required for CLI users without manual env vars):
+
+- Preferred: `https://myshop.com/.well-known/gss.json` with:
+
+```json
+{"endpoint":"https://gss.myshop.com/v1"}
+```
+
+- Fallback DNS TXT: `_gss.myshop.com` = `endpoint=https://gss.myshop.com/v1`
+
+See `docs/discovery-setup.md` for SaaS and self-hosted placement patterns.
 
 ## Production Launch Checklist (First Real Tenant)
 

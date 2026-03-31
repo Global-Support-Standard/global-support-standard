@@ -20,6 +20,8 @@ export GSS_DEFAULT_ENDPOINT="https://gss-provider-125211190390.europe-west4.run.
 export GSS_SHOP_COOLBLUE_NL_ENDPOINT="https://gss-provider-125211190390.europe-west4.run.app/v1"
 ```
 
+If the shop has discovery configured (`/.well-known/gss.json` or `_gss` DNS TXT), this manual endpoint step is not needed.
+
 ## Authenticate (Agent-first flow)
 
 ```bash
