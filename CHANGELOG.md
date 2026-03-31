@@ -6,6 +6,16 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-31
+
+### Added
+- CLI endpoint auto-discovery using `/.well-known/gss.json` and DNS TXT `_gss.<shop-domain>`.
+- Discovery setup guide with simple instructions for SaaS multi-tenant and self-hosted webshops (`docs/discovery-setup.md`).
+
+### Changed
+- CLI connection failures now show a short, readable red error instead of a full traceback.
+- Shop and consumer guides now include concise discovery placement instructions.
+
 ## [0.2.2] - 2026-03-29
 
 ### Added

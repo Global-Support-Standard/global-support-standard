@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
@@ -111,3 +112,55 @@ def test_cli_validate_command(monkeypatch, tmp_path: Path) -> None:
     payload = json.loads(res.output)
     assert payload["shop"] == "mockshop.local"
     assert payload["level"] == "basic"
+
+
+def test_cli_uses_discovered_endpoint_when_no_env(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cli_main, "TOKEN_PATH", tmp_path / "tokens.json")
+    monkeypatch.delenv("GSS_DEFAULT_ENDPOINT", raising=False)
+    monkeypatch.setattr(cli_main, "_discover_endpoint", lambda shop: "https://discovered.example/v1")
+
+    observed: dict[str, Any] = {}
+
+    def fake_request(
+        *,
+        method: str,
+        endpoint: str,
+        path: str,
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        observed["endpoint"] = endpoint
+        return {"status": "ok", "data": {"shop": "shop.example"}, "error": None, "meta": {}}
+
+    monkeypatch.setattr(cli_main, "_request", fake_request)
+    runner = CliRunner()
+    res = runner.invoke(cli_main.app, ["shop.example", "describe"])
+    assert res.exit_code == 0, res.output
+    assert observed["endpoint"] == "https://discovered.example/v1"
+
+
+def test_cli_connection_error_is_short_and_human_readable(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cli_main, "TOKEN_PATH", tmp_path / "tokens.json")
+    monkeypatch.setenv("GSS_DEFAULT_ENDPOINT", "http://127.0.0.1:8000/v1")
+
+    class FailingClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def request(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            req = httpx.Request("GET", "http://127.0.0.1:8000/v1/describe")
+            raise httpx.ConnectError("Connection refused", request=req)
+
+    monkeypatch.setattr(cli_main.httpx, "Client", FailingClient)
+    runner = CliRunner()
+    res = runner.invoke(cli_main.app, ["mockshop.local", "describe"])
+    assert res.exit_code == 1
+    assert "Connection refused: could not reach endpoint" in res.stderr
+    assert "Traceback" not in res.stderr

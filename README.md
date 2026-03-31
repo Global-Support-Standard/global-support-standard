@@ -223,6 +223,7 @@ Current test coverage includes:
 - Cloud Run deployment: `docs/deploy-cloud-run.md`
 - Registry security spec: `docs/registry-security.md`
 - Registry conformance checklist: `docs/registry-conformance-checklist.md`
+- Discovery setup guide: `docs/discovery-setup.md`
 - Conformance schema: `schemas/conformance/agent-delegation-checklist.json`
 - Shopify webshop project: `webshop/shopify-test-store/README.md`
 - Shop onboarding: `docs/getting-started-shops.md`
