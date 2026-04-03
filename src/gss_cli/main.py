@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import typer
@@ -22,6 +23,10 @@ def _shop_env_key(shop: str) -> str:
 
 def _normalize_endpoint(endpoint: str) -> str:
     return endpoint.rstrip("/")
+
+
+def _safe_path_segment(value: Any) -> str:
+    return quote(str(value), safe="")
 
 
 def _looks_like_domain(shop: str) -> bool:
@@ -202,6 +207,13 @@ def _required(flags: dict[str, Any], *keys: str) -> None:
         raise typer.BadParameter(f"Missing required flag(s): {', '.join('--' + m.replace('_', '-') for m in missing)}")
 
 
+def _first_flag(flags: dict[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in flags:
+            return flags[name]
+    return None
+
+
 def _warn_if_uncertified(describe_payload: dict[str, Any]) -> None:
     data = describe_payload.get("data", {})
     compliance = data.get("compliance")
@@ -328,7 +340,7 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
         return
 
     if action == "describe":
-        _emit(_request(method="GET", endpoint=endpoint, path=f"/{domain}/describe"))
+        _emit(_request(method="GET", endpoint=endpoint, path=f"/{domain}/describe", headers=_headers(shop, channel=channel)))
         return
 
     headers = _headers(shop, channel=channel)
@@ -339,7 +351,7 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
             return
         if action == "get":
             _required(flags, "id")
-            _emit(_request(method="GET", endpoint=endpoint, path=f"/orders/{flags['id']}", headers=headers))
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/orders/{_safe_path_segment(flags['id'])}", headers=headers))
             return
         if action in {"cancel", "modify", "reorder"}:
             _required(flags, "id")
@@ -538,20 +550,44 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
             _emit(_request(method="GET", endpoint=endpoint, path="/payments", headers=headers, params=flags))
             return
         if action == "get":
-            _required(flags, "order_id")
-            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{flags['order_id']}", headers=headers))
+            order_ref = _first_flag(flags, "order_id", "id")
+            if not order_ref:
+                raise typer.BadParameter("Missing required flag(s): --order-id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{order_ref}", headers=headers))
             return
         if action == "invoice":
-            _required(flags, "order_id")
-            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{flags['order_id']}/invoice", headers=headers))
+            order_ref = _first_flag(flags, "order_id", "id")
+            if not order_ref:
+                raise typer.BadParameter("Missing required flag(s): --order-id")
+            _emit(_request(method="GET", endpoint=endpoint, path=f"/payments/{order_ref}/invoice", headers=headers))
+            return
+        if action == "refund":
+            order_ref = _first_flag(flags, "order_id", "id")
+            if not order_ref:
+                raise typer.BadParameter("Missing required flag(s): --order-id")
+            body: dict[str, Any] = {"order_id": order_ref}
+            if "amount" in flags:
+                body["amount"] = flags["amount"]
+            if "reason" in flags:
+                body["reason"] = flags["reason"]
+            if "confirm_token" in flags:
+                body["confirm_token"] = flags["confirm_token"]
+            if "confirmation_token" in flags:
+                body["confirm_token"] = flags["confirmation_token"]
+            _emit(_request(method="POST", endpoint=endpoint, path="/payments/refund", headers=headers, body=body))
             return
         if action == "dispute":
-            _required(flags, "order_id", "reason")
-            _emit(_request(method="POST", endpoint=endpoint, path="/payments/dispute", headers=headers, body={"order_id": flags["order_id"], "reason": flags["reason"]}))
+            order_ref = _first_flag(flags, "order_id", "id")
+            if not order_ref:
+                raise typer.BadParameter("Missing required flag(s): --order-id")
+            _required(flags, "reason")
+            _emit(_request(method="POST", endpoint=endpoint, path="/payments/dispute", headers=headers, body={"order_id": order_ref, "reason": flags["reason"]}))
             return
         if action == "retry":
-            _required(flags, "order_id")
-            _emit(_request(method="POST", endpoint=endpoint, path="/payments/retry", headers=headers, body={"order_id": flags["order_id"]}))
+            order_ref = _first_flag(flags, "order_id", "id")
+            if not order_ref:
+                raise typer.BadParameter("Missing required flag(s): --order-id")
+            _emit(_request(method="POST", endpoint=endpoint, path="/payments/retry", headers=headers, body={"order_id": order_ref}))
             return
 
     if domain == "subscriptions":
