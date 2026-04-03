@@ -639,20 +639,6 @@ def main(ctx: typer.Context, shop: str, parts: list[str] = typer.Argument(...)) 
                 _emit(_request(method="POST", endpoint=endpoint, path="/loyalty/rewards/redeem", headers=headers, body={"reward_id": flags["reward_id"]}))
                 return
 
-    if domain == "support-hub":
-        if action in {"escalate", "handoff"}:
-            _required(flags, "conversation_id")
-            _emit(
-                _request(
-                    method="POST",
-                    endpoint=endpoint,
-                    path=f"/support-hub/{action}",
-                    headers=headers,
-                    body={"conversation_id": flags["conversation_id"]},
-                )
-            )
-            return
-
     if domain == "protocols" and action == "get":
         _required(flags, "trigger")
         context = flags.get("context", "{}")
